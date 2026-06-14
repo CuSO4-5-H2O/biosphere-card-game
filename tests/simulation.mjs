@@ -11,79 +11,186 @@ function seededRandom(seed) {
   };
 }
 
-function chooseZone(engine, card) {
-  const groups = engine.groupTotals();
-  const species = engine.speciesTotals();
-  const zone = engine.state.zones;
-  const zoneCount = (zoneId, group) =>
-    Object.entries(zone[zoneId].populations)
-      .filter(([speciesId]) => SPECIES[speciesId].group === group)
-      .reduce(
-        (sum, [, cohorts]) =>
-          sum + cohorts.reduce((subtotal, cohort) => subtotal + cohort.count, 0),
-        0,
-      );
+const STRATEGIES = {
+  balanced: {
+    name: "均衡食物网",
+    producerTarget: 220,
+    producerBeforeHerd: 105,
+    herbivoreTarget: 28,
+    predatorTarget: 3,
+    preyBeforePredator: 20,
+    speciesCaps: { gazelle: 12, zebra: 8, wildebeest: 10 },
+    preferCheap: false,
+    preferRiver: true,
+  },
+  producer_first: {
+    name: "生产者优先",
+    producerTarget: 300,
+    producerBeforeHerd: 145,
+    herbivoreTarget: 25,
+    predatorTarget: 2,
+    preyBeforePredator: 18,
+    speciesCaps: { gazelle: 11, zebra: 7, wildebeest: 9 },
+    preferCheap: false,
+    preferRiver: false,
+  },
+  diverse_herd: {
+    name: "多样草食群",
+    producerTarget: 245,
+    producerBeforeHerd: 115,
+    herbivoreTarget: 36,
+    predatorTarget: 3,
+    preyBeforePredator: 25,
+    speciesCaps: { gazelle: 14, zebra: 10, wildebeest: 13 },
+    preferCheap: false,
+    preferRiver: true,
+  },
+  low_cost: {
+    name: "低费节奏",
+    producerTarget: 195,
+    producerBeforeHerd: 90,
+    herbivoreTarget: 27,
+    predatorTarget: 2,
+    preyBeforePredator: 18,
+    speciesCaps: { gazelle: 18, zebra: 0, wildebeest: 9 },
+    preferCheap: true,
+    preferRiver: true,
+  },
+};
 
-  if (SPECIES[card.species].group === "producer") {
-    if (groups.producer >= 210 && card.cost > 1) return null;
-    const plainsPlants = zoneCount("plains", "producer");
-    const riverPlants = zoneCount("riverbank", "producer");
-    if (plainsPlants < 115) return "plains";
-    if (riverPlants < 85 && card.allowedZones.includes("riverbank")) {
+function zoneCount(engine, zoneId, groupId) {
+  return Object.entries(engine.state.zones[zoneId].populations)
+    .filter(([speciesId]) => SPECIES[speciesId].group === groupId)
+    .reduce(
+      (sum, [, cohorts]) =>
+        sum +
+        cohorts.reduce(
+          (subtotal, cohort) => subtotal + cohort.count,
+          0,
+        ),
+      0,
+    );
+}
+
+function chooseProducerZone(engine, card, strategy) {
+  const plains = zoneCount(engine, "plains", "producer");
+  const river = zoneCount(engine, "riverbank", "producer");
+  const thicket = zoneCount(engine, "thicket", "producer");
+
+  if (strategy.preferRiver && card.allowedZones.includes("riverbank")) {
+    if (river < 100) return "riverbank";
+    if (plains < 115) return "plains";
+  } else {
+    if (plains < 135) return "plains";
+    if (river < 85 && card.allowedZones.includes("riverbank")) {
       return "riverbank";
     }
-    return card.allowedZones.includes("thicket") ? "thicket" : null;
   }
-
-  if (SPECIES[card.species].group === "herbivore") {
-    if (groups.producer < 105 || groups.herbivore >= 27) return null;
-    if (card.species === "gazelle" && species.gazelle >= 10) return null;
-    if (card.species === "zebra" && species.zebra >= 7) return null;
-    if (card.species === "wildebeest" && species.wildebeest >= 9) {
-      return null;
-    }
-    const plainsLoad = zoneCount("plains", "herbivore");
-    const riverLoad = zoneCount("riverbank", "herbivore");
-    if (riverLoad < 12 && zoneCount("riverbank", "producer") >= 55) {
-      return "riverbank";
-    }
-    return plainsLoad < 22 ? "plains" : null;
+  if (card.allowedZones.includes("thicket") && thicket < 70) {
+    return "thicket";
   }
+  return card.allowedZones.includes("plains") ? "plains" : null;
+}
 
-  if (card.species === "lion") {
-    if (groups.herbivore < 18 || species.lion >= 3) return null;
+function chooseHerbivoreZone(engine, card, strategy) {
+  const riverPlants = zoneCount(engine, "riverbank", "producer");
+  const riverHerd = zoneCount(engine, "riverbank", "herbivore");
+  const plainsPlants = zoneCount(engine, "plains", "producer");
+  const plainsHerd = zoneCount(engine, "plains", "herbivore");
+
+  if (
+    strategy.preferRiver &&
+    card.allowedZones.includes("riverbank") &&
+    riverPlants >= 50 &&
+    riverHerd < Math.ceil(strategy.herbivoreTarget * 0.46)
+  ) {
+    return "riverbank";
+  }
+  if (
+    card.allowedZones.includes("plains") &&
+    plainsPlants >= 55 &&
+    plainsHerd < Math.ceil(strategy.herbivoreTarget * 0.72)
+  ) {
     return "plains";
   }
-
-  if (card.species === "hyena") {
-    if (
-      groups.herbivore < 28 ||
-      groups.predator >= 4 ||
-      engine.state.remains < 12
-    ) {
-      return null;
-    }
-    return "thicket";
+  if (
+    card.allowedZones.includes("riverbank") &&
+    riverPlants > riverHerd * 2
+  ) {
+    return "riverbank";
   }
   return null;
 }
 
-function cardPriority(engine, card) {
+function chooseZone(engine, card, strategy) {
   const groups = engine.groupTotals();
+  const species = engine.speciesTotals();
   const group = SPECIES[card.species].group;
-  if (groups.producer < 120 && group === "producer") return 0;
-  if (groups.producer >= 105 && groups.herbivore < 22 && group === "herbivore") {
-    return 1;
+
+  if (group === "producer") {
+    if (
+      groups.producer >= strategy.producerTarget &&
+      card.cost > 1
+    ) {
+      return null;
+    }
+    return chooseProducerZone(engine, card, strategy);
   }
-  if (groups.herbivore >= 22 && groups.predator < 3 && group === "predator") {
-    return card.species === "lion" ? 2 : 5;
+
+  if (group === "herbivore") {
+    if (
+      groups.producer < strategy.producerBeforeHerd ||
+      groups.herbivore >= strategy.herbivoreTarget ||
+      species[card.species] >=
+        (strategy.speciesCaps[card.species] ?? strategy.herbivoreTarget)
+    ) {
+      return null;
+    }
+    return chooseHerbivoreZone(engine, card, strategy);
   }
-  if (group === "producer") return 3;
-  if (group === "herbivore") return 4;
-  return 5;
+
+  if (
+    groups.herbivore < strategy.preyBeforePredator ||
+    groups.predator >= strategy.predatorTarget
+  ) {
+    return null;
+  }
+  if (card.species === "hyena" && engine.state.remains < 8) {
+    return null;
+  }
+  return card.allowedZones.includes("plains") ? "plains" : "thicket";
 }
 
-function playSeed(seed, environmentId) {
+function cardPriority(engine, card, strategy) {
+  const groups = engine.groupTotals();
+  const group = SPECIES[card.species].group;
+  let priority = 8;
+  if (
+    groups.producer < strategy.producerBeforeHerd &&
+    group === "producer"
+  ) {
+    priority = 0;
+  } else if (
+    groups.herbivore < strategy.herbivoreTarget &&
+    group === "herbivore"
+  ) {
+    priority = 2;
+  } else if (
+    groups.herbivore >= strategy.preyBeforePredator &&
+    groups.predator < strategy.predatorTarget &&
+    group === "predator"
+  ) {
+    priority = card.species === "lion" ? 1 : 5;
+  } else if (group === "producer") {
+    priority = 3;
+  } else if (group === "herbivore") {
+    priority = 4;
+  }
+  return priority * 10 + (strategy.preferCheap ? card.cost : 0);
+}
+
+function playSeed(seed, environmentId, strategyId) {
+  const strategy = STRATEGIES[strategyId];
   const engine = new EcosystemEngine(
     () => {},
     () => {},
@@ -94,11 +201,19 @@ function playSeed(seed, environmentId) {
   for (let turn = 1; turn <= engine.state.maxTurns; turn += 1) {
     const playable = [...engine.state.hand].sort(
       (left, right) =>
-        cardPriority(engine, left) - cardPriority(engine, right) ||
+        cardPriority(engine, left, strategy) -
+          cardPriority(engine, right, strategy) ||
         left.cost - right.cost,
     );
     for (const card of playable) {
-      const zoneId = chooseZone(engine, card);
+      if (
+        strategy.preferCheap &&
+        card.cost >= 4 &&
+        engine.state.energy < engine.state.maxEnergy
+      ) {
+        continue;
+      }
+      const zoneId = chooseZone(engine, card, strategy);
       if (zoneId && engine.state.energy >= card.cost) {
         engine.deployCard(card.instanceId, zoneId);
       }
@@ -115,20 +230,44 @@ function playSeed(seed, environmentId) {
   return {
     seed,
     environmentId,
+    strategyId,
     result: engine.result(),
-    lionHistory: engine.state.history.map((point) => point.species.lion),
     finalSpecies: engine.speciesTotals(),
-    history: engine.state.history,
   };
 }
 
 const environments = ["monsoon", "black_soil", "termite_network"];
-const runs = environments.flatMap((environmentId) =>
-  Array.from({ length: 30 }, (_, index) =>
-    playSeed(index + 1, environmentId),
+const strategyIds = Object.keys(STRATEGIES);
+const runs = strategyIds.flatMap((strategyId) =>
+  environments.flatMap((environmentId) =>
+    Array.from({ length: 24 }, (_, index) =>
+      playSeed(index + 1, environmentId, strategyId),
+    ),
   ),
 );
-const summaries = Object.fromEntries(
+
+const strategySummary = Object.fromEntries(
+  strategyIds.map((strategyId) => {
+    const strategyRuns = runs.filter(
+      (run) => run.strategyId === strategyId,
+    );
+    return [
+      strategyId,
+      {
+        name: STRATEGIES[strategyId].name,
+        wins: strategyRuns.filter((run) => run.result.won).length,
+        total: strategyRuns.length,
+        winRate: Math.round(
+          (strategyRuns.filter((run) => run.result.won).length /
+            strategyRuns.length) *
+            100,
+        ),
+      },
+    ];
+  }),
+);
+
+const environmentSummary = Object.fromEntries(
   environments.map((environmentId) => {
     const environmentRuns = runs.filter(
       (run) => run.environmentId === environmentId,
@@ -138,15 +277,11 @@ const summaries = Object.fromEntries(
       {
         wins: environmentRuns.filter((run) => run.result.won).length,
         total: environmentRuns.length,
-        lionSurvival: environmentRuns.filter(
-          (run) => run.finalSpecies.lion > 0,
-        ).length,
       },
     ];
   }),
 );
-const totalWins = runs.filter((run) => run.result.won).length;
-const sample = runs.find((run) => run.result.won) || runs[0];
+
 const failedRuns = runs.filter((run) => !run.result.won);
 const failureChecks = Object.fromEntries(
   ["launch", "producer", "herbivore", "predator", "remains"].map(
@@ -156,20 +291,16 @@ const failureChecks = Object.fromEntries(
     ],
   ),
 );
+const totalWins = runs.length - failedRuns.length;
 
 console.log(
   JSON.stringify(
     {
-      summaries,
+      strategySummary,
+      environmentSummary,
       totalWins,
       totalRuns: runs.length,
-      sample: {
-        seed: sample.seed,
-        environmentId: sample.environmentId,
-        result: sample.result,
-        lionHistory: sample.lionHistory,
-        finalSpecies: sample.finalSpecies,
-      },
+      overallWinRate: Math.round((totalWins / runs.length) * 100),
       failureChecks,
     },
     null,
@@ -177,6 +308,9 @@ console.log(
   ),
 );
 
-if (totalWins < 45) {
+const everyStrategyPlayable = Object.values(strategySummary).every(
+  (summary) => summary.winRate >= 55,
+);
+if (!everyStrategyPlayable || totalWins / runs.length < 0.62) {
   process.exitCode = 1;
 }

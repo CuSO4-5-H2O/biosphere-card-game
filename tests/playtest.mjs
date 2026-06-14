@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "file:///C:/Users/19839/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/.pnpm/playwright@1.60.0/node_modules/playwright/index.mjs";
 
-const baseUrl = "http://127.0.0.1:4173";
+const baseUrl =
+  process.env.BASE_URL || "http://127.0.0.1:4173";
 const outputDir = fileURLToPath(new URL("../artifacts/", import.meta.url));
 await mkdir(outputDir, { recursive: true });
 
@@ -22,21 +23,27 @@ function collectErrors(page, target) {
 
 const errors = [];
 const page = await browser.newPage({
-  viewport: { width: 1600, height: 1050 },
-  reducedMotion: "reduce",
+  viewport: { width: 1366, height: 768 },
 });
 collectErrors(page, errors);
 
 await page.goto(baseUrl, { waitUntil: "networkidle" });
+await page.locator("#rules-modal:not([hidden])").waitFor();
+const rules = {
+  title: await page.locator("#rules-modal h2").innerText(),
+  sections: await page.locator(".rules-grid article").count(),
+  victoryItems: await page.locator(".victory-box li").count(),
+};
+await page.locator("#continue-to-environment").click();
 await page.locator(".environment-choice").first().waitFor();
 const opening = {
   title: await page.locator("h1").innerText(),
   environmentChoices: await page.locator(".environment-choice").count(),
-  handBeforeChoice: await page.locator(".bio-card").count(),
+  handBeforeChoice: await page.locator("#hand .bio-card").count(),
 };
 await page.screenshot({
-  path: join(outputDir, "demo-1.1-environment-choice.png"),
-  fullPage: true,
+  path: join(outputDir, "demo-1.2-environment-choice.png"),
+  fullPage: false,
 });
 
 await page.locator(".environment-choice").first().click();
@@ -45,7 +52,7 @@ const initialEnergy = Number(await page.locator("#energy-value").innerText());
 const cardCosts = await page.locator(".bio-card .card-cost").allInnerTexts();
 const initial = {
   turn: await page.locator("#turn-current").innerText(),
-  handSize: await page.locator(".bio-card").count(),
+  handSize: await page.locator("#hand .bio-card").count(),
   energy: initialEnergy,
   handCost: cardCosts.reduce((sum, value) => sum + Number(value), 0),
   traitBadges: await page.locator(".trait-badge").count(),
@@ -53,27 +60,38 @@ const initial = {
   chosenEnvironment: await page
     .locator("#chosen-environment-name")
     .innerText(),
+  desktopLayout: await page.evaluate(() => ({
+    viewportHeight: window.innerHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+    viewportWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  })),
 };
 
 const firstPlayable = page.locator(".bio-card:not(:disabled)").first();
 const firstCardTitle = await firstPlayable.locator("h3").innerText();
 await firstPlayable.click();
 const eligibleZones = await page.locator(".zone-button.eligible").count();
-await page.locator(".zone-button.eligible").first().click();
+const firstZone = page.locator(".zone-button.eligible").first();
+await firstZone.click({ noWaitAfter: true });
+const cardFlightVisible = await page
+  .locator(".card-flyer")
+  .count();
 const energyAfterDeploy = Number(
   await page.locator("#energy-value").innerText(),
 );
+await page.waitForTimeout(600);
 
 await page.evaluate(() => window.gameDebug.resolveInstant());
 await page.waitForFunction(() => window.gameDebug.engine.state.turn === 2);
 const afterTurn = {
   turn: await page.locator("#turn-current").innerText(),
-  handSize: await page.locator(".bio-card").count(),
+  handSize: await page.locator("#hand .bio-card").count(),
   eventCount: await page.locator("#event-list li").count(),
   banner: await page.locator("#event-banner-title").innerText(),
 };
 await page.screenshot({
-  path: join(outputDir, "demo-1.1-after-turn.png"),
+  path: join(outputDir, "demo-1.2-after-turn.png"),
   fullPage: true,
 });
 
@@ -161,9 +179,10 @@ const completedRun = {
   auditTurns: await page.evaluate(
     () => window.gameDebug.engine.state.auditRound,
   ),
+  resultBars: await page.locator(".result-bar-row").count(),
 };
 await page.screenshot({
-  path: join(outputDir, "demo-1.1-result.png"),
+  path: join(outputDir, "demo-1.2-result.png"),
   fullPage: true,
 });
 
@@ -174,7 +193,7 @@ await page.locator("#history-button").click();
 await page.locator("#history-modal:not([hidden])").waitFor();
 const chartPaths = await page.locator("#history-chart path").count();
 await page.screenshot({
-  path: join(outputDir, "demo-1.1-history.png"),
+  path: join(outputDir, "demo-1.2-history.png"),
   fullPage: true,
 });
 
@@ -185,10 +204,11 @@ const mobile = await browser.newPage({
 });
 collectErrors(mobile, mobileErrors);
 await mobile.goto(baseUrl, { waitUntil: "networkidle" });
+await mobile.locator("#continue-to-environment").click();
 await mobile.locator(".environment-choice").first().click();
 await mobile.locator(".bio-card").first().waitFor();
 await mobile.screenshot({
-  path: join(outputDir, "demo-1.1-mobile.png"),
+  path: join(outputDir, "demo-1.2-mobile.png"),
   fullPage: true,
 });
 const mobileLayout = await mobile.evaluate(() => ({
@@ -199,11 +219,13 @@ const mobileLayout = await mobile.evaluate(() => ({
 }));
 
 const report = {
+  rules,
   opening,
   initial,
   interaction: {
     firstCardTitle,
     eligibleZones,
+    cardFlightVisible,
     energyAfterDeploy,
   },
   afterTurn,
@@ -218,15 +240,24 @@ console.log(JSON.stringify(report, null, 2));
 await browser.close();
 
 const failed =
+  rules.sections !== 3 ||
+  rules.victoryItems !== 3 ||
   opening.environmentChoices !== 3 ||
   initial.handSize !== 5 ||
+  initial.energy !== 5 ||
   initial.handCost <= initial.energy ||
   initial.traitBadges !== initial.handSize ||
   eligibleZones < 1 ||
+  cardFlightVisible < 1 ||
   energyAfterDeploy >= initial.energy ||
+  initial.desktopLayout.scrollHeight !==
+    initial.desktopLayout.viewportHeight ||
+  initial.desktopLayout.scrollWidth >
+    initial.desktopLayout.viewportWidth ||
   auditStart.phase !== "audit" ||
   completedRun.auditTurns !== 10 ||
   completedRun.historyPoints !== 19 ||
+  completedRun.resultBars !== 7 ||
   chartPaths !== 3 ||
   mobileLayout.scrollWidth > mobileLayout.viewportWidth ||
   errors.length > 0 ||

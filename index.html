@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#172019" />
-    <title>生息界：非洲草原 Demo 1.1</title>
+    <title>生息界：非洲草原 Demo 1.2</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><circle cx=%2232%22 cy=%2232%22 r=%2225%22 fill=%22%23efb75d%22/><path d=%22M17 42c8-14 19-20 30-22-4 15-14 25-30 22Z%22 fill=%22%235b7c49%22/></svg>" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -14,7 +14,7 @@
         <div class="brand">
           <div class="brand-mark" aria-hidden="true"><span></span></div>
           <div>
-            <p class="overline">BIOSPHERE CARD GAME · DEMO 1.1</p>
+            <p class="overline">BIOSPHERE CARD GAME · DEMO 1.2</p>
             <h1>生息界 <small>非洲草原</small></h1>
           </div>
         </div>
@@ -26,13 +26,16 @@
           </div>
           <div class="hud-value energy-value">
             <span>部署能量</span>
-            <strong id="energy-value">4</strong>
+            <strong id="energy-value">5</strong>
           </div>
           <div class="hud-value">
             <span>生态稳定度</span>
             <strong id="stability-value">0</strong>
           </div>
-          <button id="history-button" class="ghost-button" type="button">
+          <button id="rules-button" class="ghost-button compact-button" type="button">
+            游戏规则
+          </button>
+          <button id="history-button" class="ghost-button compact-button" type="button">
             生态档案
           </button>
         </div>
@@ -53,9 +56,9 @@
             <div class="environment-content">
               <span class="card-kicker">天体 · 固有环境</span>
               <h3>赤道阳光</h3>
-              <p>每回合提供 <b>2</b> 点基础部署能量。生产者充足时额外提供 1 点。</p>
+              <p>每回合提供 <b>3</b> 点基础部署能量。生产者充足时额外提供 1 点。</p>
               <div class="environment-stat">
-                <span>能量上限</span><strong>6</strong>
+                <span>能量上限</span><strong>7</strong>
               </div>
             </div>
           </article>
@@ -69,7 +72,7 @@
             <div class="environment-content">
               <span class="card-kicker">循环 · 固有环境</span>
               <h3>土壤分解者</h3>
-              <p>每回合处理 16 点排泄物与尸体，将物质返还为土壤养分。</p>
+              <p>每回合处理 20 点排泄物与尸体，将物质返还为土壤养分。</p>
               <div class="environment-stat">
                 <span>部署能量</span><strong>不再返还</strong>
               </div>
@@ -197,7 +200,7 @@
 
           <div class="resource-panel">
             <div class="resource-row">
-              <span>土壤养分</span><strong id="nutrient-value">30</strong>
+              <span>土壤养分</span><strong id="nutrient-value">40</strong>
               <div class="meter"><i id="nutrient-bar"></i></div>
             </div>
             <div class="resource-row">
@@ -251,7 +254,50 @@
       </section>
     </main>
 
-    <div id="environment-modal" class="modal">
+    <div id="rules-modal" class="modal">
+      <div class="modal-card rules-modal-card">
+        <p class="overline">FIELD GUIDE · DEMO 1.2</p>
+        <h2>建立一座能自行运转的生物群系</h2>
+        <p>你有 8 回合部署生物。之后停止干预，让生态系统独立运行 10 回合。</p>
+        <div class="rules-grid">
+          <article>
+            <span>01 · 部署</span>
+            <h3>有限能量选择卡牌</h3>
+            <p>每回合无法打完所有牌。先铺生产者，再控制草食动物和捕食者密度。</p>
+          </article>
+          <article>
+            <span>02 · 区域</span>
+            <h3>利用三种栖息地</h3>
+            <p>河岸生长快，草原利于捕食，灌丛能提供庇护。缺食动物会尝试迁徙。</p>
+          </article>
+          <article>
+            <span>03 · 结算</span>
+            <h3>观察自动生态循环</h3>
+            <p>植物生长、采食、捕食、繁殖、死亡和分解会依次自动发生。</p>
+          </article>
+        </div>
+        <div class="victory-box">
+          <div>
+            <span>基础胜利条件</span>
+            <strong>无人干预稳定运行 10 回合</strong>
+          </div>
+          <ul>
+            <li>生产者、草食动物、捕食者均不能断层</li>
+            <li>后 5 回合种群进入合理波动范围</li>
+            <li>有机残留保持在分解系统可处理范围内</li>
+          </ul>
+        </div>
+        <div class="tip-strip">
+          <b>开局提示</b>
+          <span>先用约 2 回合建立植物，再逐步加入 18–30 只草食动物；2–3 只狮子通常已经足够。</span>
+        </div>
+        <button id="continue-to-environment" class="restart-button" type="button">
+          选择本局环境
+        </button>
+      </div>
+    </div>
+
+    <div id="environment-modal" class="modal" hidden>
       <div class="modal-card environment-choice-card">
         <p class="overline">CHOOSE GLOBAL ENVIRONMENT</p>
         <h2>选择本局环境牌</h2>
@@ -293,7 +339,16 @@
         <div id="result-emblem" class="result-emblem">◎</div>
         <h2 id="result-title">生物群系稳定</h2>
         <p id="result-copy"></p>
-        <div id="result-metrics" class="result-metrics"></div>
+        <div class="result-summary-grid">
+          <div id="result-metrics" class="result-metrics"></div>
+          <div class="result-chart-panel">
+            <div class="result-chart-head">
+              <span>最终物种数量</span>
+              <small>审计第 10 回合</small>
+            </div>
+            <div id="result-population-chart" class="result-population-chart"></div>
+          </div>
+        </div>
         <button id="restart-button" class="restart-button" type="button">重新开始关卡</button>
       </div>
     </div>

@@ -54,6 +54,9 @@ const elements = {
   environmentChoices: document.querySelector("#environment-choices"),
   auditModal: document.querySelector("#audit-modal"),
   startAuditButton: document.querySelector("#start-audit-button"),
+  rulesButton: document.querySelector("#rules-button"),
+  rulesModal: document.querySelector("#rules-modal"),
+  continueToEnvironment: document.querySelector("#continue-to-environment"),
   historyButton: document.querySelector("#history-button"),
   historyModal: document.querySelector("#history-modal"),
   historyChart: document.querySelector("#history-chart"),
@@ -63,6 +66,7 @@ const elements = {
   resultTitle: document.querySelector("#result-title"),
   resultCopy: document.querySelector("#result-copy"),
   resultMetrics: document.querySelector("#result-metrics"),
+  resultPopulationChart: document.querySelector("#result-population-chart"),
   restartButton: document.querySelector("#restart-button"),
 };
 
@@ -94,6 +98,7 @@ let latestState = null;
 let mapScene = null;
 let engine = null;
 let auditRunning = false;
+const seenCardInstances = new Set();
 
 function zoneSpeciesCount(zone, speciesId) {
   return zone.populations[speciesId].reduce(
@@ -409,6 +414,14 @@ function createCardButton(card) {
   button.disabled =
     latestState.phase !== "deploy" || card.cost > latestState.energy;
   button.title = `${card.traitName}：${card.traitText}`;
+  if (!seenCardInstances.has(card.instanceId)) {
+    button.classList.add("card-enter");
+    button.style.setProperty(
+      "--card-delay",
+      `${Math.min(seenCardInstances.size % 5, 4) * 55}ms`,
+    );
+    seenCardInstances.add(card.instanceId);
+  }
   if (selectedCardId === card.instanceId) button.classList.add("selected");
   button.innerHTML = `
     <span class="card-cost">${card.cost}</span>
@@ -634,11 +647,13 @@ async function playResolution(mode = "player", animationDelay = 500) {
       (item) => item.dataset.step === step.key,
     );
     listItem?.classList.add("active");
+    document.body.dataset.resolutionEffect = step.key;
     elements.resolutionTitle.textContent = step.title;
     elements.turnMessage.textContent = step.message;
     render(step.snapshot);
     mapScene?.showResolution(step);
     await wait(animationDelay);
+    delete document.body.dataset.resolutionEffect;
     listItem?.classList.remove("active");
     listItem?.classList.add("complete");
   }
@@ -720,8 +735,8 @@ function buildHistoryChart() {
         <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />
       </g>
       <g fill="#7f887c" font-family="Segoe UI, Microsoft YaHei" font-size="10">${labels}</g>
-      <path d="${pathFor("producer", 120)}" fill="none" stroke="#8eae63" stroke-width="3" />
-      <path d="${pathFor("herbivore", 24)}" fill="none" stroke="#d7a361" stroke-width="3" />
+      <path d="${pathFor("producer", 100)}" fill="none" stroke="#8eae63" stroke-width="3" />
+      <path d="${pathFor("herbivore", 20)}" fill="none" stroke="#d7a361" stroke-width="3" />
       <path d="${pathFor("predator", 3)}" fill="none" stroke="#d66b47" stroke-width="3" />
     </svg>
   `;
@@ -757,7 +772,7 @@ function showResult(result) {
       result.checks.predator,
     ],
     [
-      "物种保留",
+      "物种完整性（附加）",
       result.checks.retainedSpecies ? "完整" : "发生灭绝",
       result.checks.retainedSpecies,
     ],
@@ -778,6 +793,72 @@ function showResult(result) {
         `<div><span>${label}</span><strong style="color:${passed ? "#89b97b" : "#d66b47"}">${value}</strong></div>`,
     )
     .join("");
+  buildResultPopulationChart(result);
+}
+
+function buildResultPopulationChart(result) {
+  const entries = Object.entries(result.species).map(
+    ([speciesId, value]) => ({
+      value,
+      name: SPECIES[speciesId].shortName,
+      group: SPECIES[speciesId].group,
+    }),
+  );
+  const maximum = Math.max(1, ...entries.map((entry) => entry.value));
+  elements.resultPopulationChart.innerHTML = entries
+    .map(
+      (entry) => `
+        <div class="result-bar-row ${entry.group}">
+          <span>${entry.name}</span>
+          <div class="result-bar-track">
+            <i style="--bar-size:${Math.max(3, (entry.value / maximum) * 100)}%"></i>
+          </div>
+          <strong>${entry.value}</strong>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function playCardFlight(cardElement, zoneElement, card) {
+  if (
+    !cardElement ||
+    !zoneElement ||
+    !card ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    return;
+  }
+  const start = cardElement.getBoundingClientRect();
+  const target = zoneElement.getBoundingClientRect();
+  const flyer = cardElement.cloneNode(true);
+  flyer.classList.add("card-flyer");
+  Object.assign(flyer.style, {
+    left: `${start.left}px`,
+    top: `${start.top}px`,
+    width: `${start.width}px`,
+    height: `${start.height}px`,
+  });
+  document.body.append(flyer);
+  flyer
+    .animate(
+      [
+        { transform: "translate3d(0,0,0) scale(1)", opacity: 1 },
+        {
+          transform: `translate3d(${target.left + target.width / 2 - start.left - start.width / 2}px, ${target.top + target.height / 2 - start.top - start.height / 2}px, 0) scale(.28) rotate(${card.species === "lion" ? -7 : 7}deg)`,
+          opacity: 0.2,
+        },
+      ],
+      { duration: 520, easing: "cubic-bezier(.2,.8,.2,1)" },
+    )
+    .finished.finally(() => flyer.remove());
+
+  const burst = document.createElement("span");
+  burst.className = `zone-burst ${SPECIES[card.species].group}`;
+  zoneElement.append(burst);
+  burst.addEventListener("animationend", () => burst.remove(), {
+    once: true,
+  });
 }
 
 function handleEffect(effect) {
@@ -795,9 +876,16 @@ elements.zoneButtons.forEach((button) => {
       elements.placementHint.textContent = "请先从下方选择一张生物牌";
       return;
     }
+    const cardElement = document.querySelector(
+      `.bio-card[data-card-id="${selectedCardId}"]`,
+    );
+    const card = latestState.hand.find(
+      (handCard) => handCard.instanceId === selectedCardId,
+    );
     const result = engine.deployCard(selectedCardId, button.dataset.zone);
     elements.placementHint.textContent = result.reason;
     if (result.ok) {
+      playCardFlight(cardElement, button, card || result.card);
       selectedCardId = null;
       button.classList.remove("deploy-flash");
       void button.offsetWidth;
@@ -813,6 +901,17 @@ elements.clearSelection.addEventListener("click", () => {
 });
 elements.endTurn.addEventListener("click", () => playResolution("player"));
 elements.startAuditButton.addEventListener("click", () => runAudit());
+elements.rulesButton.addEventListener("click", () => {
+  elements.continueToEnvironment.textContent =
+    engine.state.phase === "environment" ? "选择本局环境" : "返回游戏";
+  elements.rulesModal.hidden = false;
+});
+elements.continueToEnvironment.addEventListener("click", () => {
+  elements.rulesModal.hidden = true;
+  if (engine.state.phase === "environment") {
+    elements.environmentModal.hidden = false;
+  }
+});
 elements.historyButton.addEventListener("click", () => {
   buildHistoryChart();
   elements.historyModal.hidden = false;
@@ -830,9 +929,12 @@ elements.historyModal.addEventListener("click", (event) => {
 elements.restartButton.addEventListener("click", () => {
   elements.resultModal.hidden = true;
   elements.auditModal.hidden = true;
-  elements.environmentModal.hidden = false;
+  elements.environmentModal.hidden = true;
+  elements.rulesModal.hidden = false;
+  elements.continueToEnvironment.textContent = "选择本局环境";
   selectedCardId = null;
   auditRunning = false;
+  seenCardInstances.clear();
   resetResolutionSteps();
   elements.resolutionTitle.textContent = "等待环境选择";
   elements.turnMessage.textContent =

@@ -5,7 +5,7 @@ export const ZONES = {
     plantGrowth: 1.25,
     grazing: 1.08,
     huntChance: 0.66,
-    plantCapacity: 220,
+    plantCapacity: 245,
   },
   plains: {
     id: "plains",
@@ -13,7 +13,7 @@ export const ZONES = {
     plantGrowth: 1,
     grazing: 1,
     huntChance: 0.82,
-    plantCapacity: 190,
+    plantCapacity: 215,
   },
   thicket: {
     id: "thicket",
@@ -21,7 +21,7 @@ export const ZONES = {
     plantGrowth: 0.84,
     grazing: 0.9,
     huntChance: 0.58,
-    plantCapacity: 155,
+    plantCapacity: 175,
   },
 };
 
@@ -46,7 +46,7 @@ export const SPECIES = {
     shortName: "羚",
     group: "herbivore",
     unit: "只",
-    foodNeed: 1.5,
+    foodNeed: 1.38,
     reproduction: 0.1,
     preyValue: 1.2,
   },
@@ -56,7 +56,7 @@ export const SPECIES = {
     shortName: "斑",
     group: "herbivore",
     unit: "只",
-    foodNeed: 2.1,
+    foodNeed: 1.92,
     reproduction: 0.07,
     preyValue: 2.1,
   },
@@ -66,7 +66,7 @@ export const SPECIES = {
     shortName: "角",
     group: "herbivore",
     unit: "只",
-    foodNeed: 1.9,
+    foodNeed: 1.74,
     reproduction: 0.08,
     preyValue: 1.9,
   },
@@ -317,10 +317,10 @@ const GROUPS = {
 };
 
 const HAND_SIZE = 5;
-const MAX_ENERGY = 6;
+const MAX_ENERGY = 7;
 const PLAYER_TURNS = 8;
 const AUDIT_TURNS = 10;
-const BASE_DECOMPOSER_CAPACITY = 16;
+const BASE_DECOMPOSER_CAPACITY = 20;
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -370,9 +370,9 @@ export class EcosystemEngine {
       auditBaseline: null,
       environment: null,
       currentEvent: null,
-      energy: 4,
+      energy: 5,
       maxEnergy: MAX_ENERGY,
-      nutrients: 30,
+      nutrients: 40,
       remains: 0,
       zones: Object.fromEntries(
         Object.keys(ZONES).map((zoneId) => [
@@ -535,7 +535,7 @@ export class EcosystemEngine {
         Math.max(
           0,
           Math.round(
-            16 *
+            19 *
               zoneRule.plantGrowth *
               environment.modifiers.plantGrowth *
               eventGrowth *
@@ -909,8 +909,8 @@ export class EcosystemEngine {
     );
 
     const groupsAfter = this.groupTotals();
-    const baseEnergy = 2;
-    const producerBonus = groupsAfter.producer >= 110 ? 1 : 0;
+    const baseEnergy = 3;
+    const producerBonus = groupsAfter.producer >= 90 ? 1 : 0;
     const energyGain = baseEnergy + producerBonus;
     if (mode === "player") {
       this.state.energy = Math.min(
@@ -1009,7 +1009,7 @@ export class EcosystemEngine {
           : "本回合没有重大环境事件。",
       growthMultiplier: 1,
     };
-    const eventChance = mode === "audit" ? 0.32 : 0.48;
+    const eventChance = mode === "audit" ? 0.22 : 0.44;
     if (this.random() > eventChance) {
       this.state.currentEvent = noEvent;
       return noEvent;
@@ -1134,7 +1134,7 @@ export class EcosystemEngine {
         growth += Math.min(
           Math.max(0, capacity - producerCount),
           Math.round(
-            16 *
+            19 *
               ZONES[zoneId].plantGrowth *
               environment.modifiers.plantGrowth *
               (1 + this.groupTrait(zone, "producer", "growth")),
@@ -1179,7 +1179,7 @@ export class EcosystemEngine {
       herbivoreDemand: Math.ceil(demand),
       huntAttempts,
       expectedHunts,
-      energyGain: 2 + (groups.producer >= 110 ? 1 : 0),
+      energyGain: 3 + (groups.producer >= 90 ? 1 : 0),
     };
   }
 
@@ -1193,8 +1193,8 @@ export class EcosystemEngine {
     const finalGroups = this.groupTotals();
     const finalSpecies = this.speciesTotals();
     const launchChecks = {
-      producer: baseline.groups.producer >= 100,
-      herbivore: baseline.groups.herbivore >= 20,
+      producer: baseline.groups.producer >= 90,
+      herbivore: baseline.groups.herbivore >= 18,
       predator: baseline.groups.predator >= 2,
     };
     const bands = {};
@@ -1208,10 +1208,10 @@ export class EcosystemEngine {
       const minimum = Math.min(...settledRatios, finalRatio);
       const maximum = Math.max(...settledRatios, finalRatio);
       const minimumAllowed =
-        groupId === "producer" ? 0.35 : groupId === "herbivore" ? 0.3 : 0.34;
-      const maximumAllowed = groupId === "producer" ? 2 : 2.5;
+        groupId === "producer" ? 0.2 : 0.25;
+      const maximumAllowed = groupId === "producer" ? 2.5 : 3;
       const volatilityAllowed =
-        groupId === "producer" ? 1.8 : groupId === "herbivore" ? 2 : 2.5;
+        groupId === "producer" ? 2.5 : groupId === "herbivore" ? 2.8 : 3;
       const uninterrupted = values.every((value) => value > 0);
       const volatility =
         maximum / Math.max(0.01, minimum);
@@ -1232,8 +1232,8 @@ export class EcosystemEngine {
       .filter(([, count]) => count > 0)
       .every(([speciesId]) => finalSpecies[speciesId] > 0);
     const remainsStable =
-      this.state.remains <= 60 &&
-      auditPoints.every((point) => point.remains <= 75);
+      this.state.remains <= 75 &&
+      auditPoints.every((point) => point.remains <= 95);
     const checks = {
       launch: Object.values(launchChecks).every(Boolean),
       producer: bands.producer.stable,
@@ -1519,8 +1519,8 @@ export class EcosystemEngine {
   stability(sourceState = this.state) {
     const groups = this.groupTotals(sourceState);
     if (groups.producer + groups.herbivore + groups.predator === 0) return 0;
-    const producerScore = Math.min(1, groups.producer / 120);
-    const herbivoreScore = Math.min(1, groups.herbivore / 24);
+    const producerScore = Math.min(1, groups.producer / 100);
+    const herbivoreScore = Math.min(1, groups.herbivore / 20);
     const predatorScore = Math.min(1, groups.predator / 3);
     const cycleScore = 1 - Math.min(1, sourceState.remains / 65);
     return Math.round(
@@ -1535,12 +1535,12 @@ export class EcosystemEngine {
   objectiveProgress(sourceState = this.state) {
     const groups = this.groupTotals(sourceState);
     return [
-      groups.producer >= 100,
-      groups.herbivore >= 20,
+      groups.producer >= 90,
+      groups.herbivore >= 18,
       groups.predator >= 2,
       sourceState.remains <= 30 &&
-        groups.producer >= 100 &&
-        groups.herbivore >= 20 &&
+        groups.producer >= 90 &&
+        groups.herbivore >= 18 &&
         groups.predator >= 2,
     ].filter(Boolean).length;
   }
