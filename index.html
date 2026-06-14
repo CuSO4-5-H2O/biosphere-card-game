@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#172019" />
+    <title>生息界：非洲草原 Demo 1.1</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><circle cx=%2232%22 cy=%2232%22 r=%2225%22 fill=%22%23efb75d%22/><path d=%22M17 42c8-14 19-20 30-22-4 15-14 25-30 22Z%22 fill=%22%235b7c49%22/></svg>" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span></div>
+          <div>
+            <p class="overline">BIOSPHERE CARD GAME · DEMO 1.1</p>
+            <h1>生息界 <small>非洲草原</small></h1>
+          </div>
+        </div>
+
+        <div class="turn-hud" aria-label="本局状态">
+          <div class="hud-value">
+            <span id="turn-label">构筑回合</span>
+            <strong><b id="turn-current">1</b><span id="turn-suffix"> / 8</span></strong>
+          </div>
+          <div class="hud-value energy-value">
+            <span>部署能量</span>
+            <strong id="energy-value">4</strong>
+          </div>
+          <div class="hud-value">
+            <span>生态稳定度</span>
+            <strong id="stability-value">0</strong>
+          </div>
+          <button id="history-button" class="ghost-button" type="button">
+            生态档案
+          </button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="environment-rail">
+          <div class="section-heading">
+            <p class="overline">GLOBAL ENVIRONMENT</p>
+            <h2>环境牌</h2>
+            <span>开局选择影响全局</span>
+          </div>
+
+          <article class="environment-card sun-card">
+            <div class="env-art sun-art" aria-hidden="true">
+              <span class="sun-orb"></span><i></i><i></i><i></i>
+            </div>
+            <div class="environment-content">
+              <span class="card-kicker">天体 · 固有环境</span>
+              <h3>赤道阳光</h3>
+              <p>每回合提供 <b>2</b> 点基础部署能量。生产者充足时额外提供 1 点。</p>
+              <div class="environment-stat">
+                <span>能量上限</span><strong>6</strong>
+              </div>
+            </div>
+          </article>
+
+          <article class="environment-card decomposer-card">
+            <div class="env-art soil-art" aria-hidden="true">
+              <span class="soil-line one"></span>
+              <span class="soil-line two"></span>
+              <span class="mycelium"></span>
+            </div>
+            <div class="environment-content">
+              <span class="card-kicker">循环 · 固有环境</span>
+              <h3>土壤分解者</h3>
+              <p>每回合处理 16 点排泄物与尸体，将物质返还为土壤养分。</p>
+              <div class="environment-stat">
+                <span>部署能量</span><strong>不再返还</strong>
+              </div>
+            </div>
+          </article>
+
+          <article id="chosen-environment" class="environment-card chosen-environment">
+            <div class="chosen-env-mark">?</div>
+            <div class="environment-content">
+              <span class="card-kicker">本局选择</span>
+              <h3 id="chosen-environment-name">等待选择</h3>
+              <p id="chosen-environment-text">从三张环境牌中选择一张，确定本局发展方向。</p>
+              <div class="environment-stat">
+                <span>环境类型</span><strong id="chosen-environment-type">—</strong>
+              </div>
+            </div>
+          </article>
+        </aside>
+
+        <section class="ecosystem-stage">
+          <div class="stage-header">
+            <div>
+              <p class="overline">LEVEL 01 · SERENGETI</p>
+              <h2>塞伦盖蒂生态试验区</h2>
+            </div>
+            <div id="phase-badge" class="phase-badge">选择环境</div>
+          </div>
+
+          <div class="objective-strip">
+            <span class="objective-label">胜利条件</span>
+            <p id="objective-copy">用 8 回合建立食物网，然后在无人干预下稳定运行 10 回合。</p>
+            <span id="objective-progress" class="objective-progress">准备中</span>
+          </div>
+
+          <div class="map-wrap">
+            <div id="phaser-game" aria-label="非洲草原区域地图"></div>
+            <div id="zone-buttons" class="zone-buttons">
+              <button class="zone-button" data-zone="riverbank" type="button">
+                <span>河岸草甸</span><small>植物生长 +25%</small>
+              </button>
+              <button class="zone-button" data-zone="plains" type="button">
+                <span>开阔草原</span><small>捕食成功率最高</small>
+              </button>
+              <button class="zone-button" data-zone="thicket" type="button">
+                <span>金合欢灌丛</span><small>庇护降低捕食率</small>
+              </button>
+            </div>
+            <div id="event-banner" class="event-banner" hidden>
+              <span>随机事件</span><strong id="event-banner-title"></strong>
+            </div>
+            <div id="placement-hint" class="placement-hint">
+              请先选择本局环境牌
+            </div>
+          </div>
+
+          <div class="resolution-panel">
+            <div class="resolution-head">
+              <div>
+                <p class="overline">TURN RESOLUTION</p>
+                <h3 id="resolution-title">等待环境选择</h3>
+              </div>
+              <span id="forecast-value">每回合只能部署有限生物</span>
+            </div>
+            <ol id="resolution-steps" class="resolution-steps seven-steps">
+              <li data-step="event"><i>1</i><span>环境事件</span></li>
+              <li data-step="sun"><i>2</i><span>植物生长</span></li>
+              <li data-step="graze"><i>3</i><span>草食采食</span></li>
+              <li data-step="hunt"><i>4</i><span>捕食食腐</span></li>
+              <li data-step="metabolism"><i>5</i><span>代谢繁殖</span></li>
+              <li data-step="decompose"><i>6</i><span>分解循环</span></li>
+              <li data-step="energy"><i>7</i><span>能量/记录</span></li>
+            </ol>
+            <div id="turn-message" class="turn-message" aria-live="polite">
+              不同环境会改变植物增长、承载力或分解能力。
+            </div>
+          </div>
+        </section>
+
+        <aside class="data-rail">
+          <div class="section-heading data-heading">
+            <div>
+              <p class="overline">LIVE MONITOR</p>
+              <h2>生态监测</h2>
+            </div>
+            <span id="balance-status" class="status-pill warning">尚未建立</span>
+          </div>
+
+          <div class="population-grid">
+            <article class="population-card grass">
+              <div class="population-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><path d="M24 41V12M24 29 13 18M24 33l12-15M24 24l6-9M20 38 9-7" /></svg>
+              </div>
+              <div class="population-copy">
+                <span>生产者总量</span>
+                <strong id="grass-total">0</strong><small>生物量</small>
+                <p id="producer-breakdown">草 0 · 金合欢 0</p>
+              </div>
+              <em id="grass-delta">—</em>
+            </article>
+
+            <article class="population-card gazelle">
+              <div class="population-icon" aria-hidden="true">
+                <svg viewBox="0 0 56 48"><path d="M12 31c6-10 20-11 28-4l7-2M15 31l-4 12m13-11-2 11m15-14 3 14m4-16 5 16M39 24c1-8 5-12 9-12m-7 10c-2-7-1-12 2-16" /><circle cx="48" cy="13" r="1.7" /></svg>
+              </div>
+              <div class="population-copy">
+                <span>草食动物</span>
+                <strong id="gazelle-total">0</strong><small>个体</small>
+                <p id="herbivore-breakdown">瞪羚 0 · 斑马 0 · 角马 0</p>
+              </div>
+              <em id="gazelle-delta">—</em>
+            </article>
+
+            <article class="population-card lion">
+              <div class="population-icon" aria-hidden="true">
+                <svg viewBox="0 0 56 48"><circle cx="41" cy="21" r="9" /><path d="M34 25c-9-5-21-2-24 8l-4 1m12-4-1 13m14-14 3 14m10-15 5 15M48 18l5-4" /><circle cx="44" cy="20" r="1.4" /></svg>
+              </div>
+              <div class="population-copy">
+                <span>捕食者</span>
+                <strong id="lion-total">0</strong><small>个体</small>
+                <p id="predator-breakdown">狮 0 · 鬣狗 0</p>
+              </div>
+              <em id="lion-delta">—</em>
+            </article>
+          </div>
+
+          <div class="resource-panel">
+            <div class="resource-row">
+              <span>土壤养分</span><strong id="nutrient-value">30</strong>
+              <div class="meter"><i id="nutrient-bar"></i></div>
+            </div>
+            <div class="resource-row">
+              <span>有机残留</span><strong id="remains-value">0</strong>
+              <div class="meter remains"><i id="remains-bar"></i></div>
+            </div>
+          </div>
+
+          <div class="forecast-card">
+            <div class="forecast-head">
+              <span>下回合生态预估</span><small>不含随机事件</small>
+            </div>
+            <ul id="forecast-list">
+              <li><span>植物潜在生长</span><b>等待环境</b></li>
+              <li><span>草食供需</span><b>等待环境</b></li>
+              <li><span>捕食预期</span><b>等待环境</b></li>
+            </ul>
+          </div>
+
+          <div class="event-log">
+            <div class="event-log-head">
+              <span>本局记录</span>
+              <button id="clear-selection" type="button">取消选牌</button>
+            </div>
+            <ol id="event-list">
+              <li><time>准备</time><p>请选择全局环境。</p></li>
+            </ol>
+          </div>
+        </aside>
+      </section>
+
+      <section class="hand-dock">
+        <div class="deck-status">
+          <div class="deck-stack" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div>
+            <span>生物牌组</span>
+            <strong><b id="draw-count">18</b> 抽牌堆</strong>
+            <small><b id="discard-count">0</b> 弃牌堆</small>
+          </div>
+        </div>
+
+        <div id="hand" class="hand" aria-label="生物手牌">
+          <div class="empty-hand">选择环境后抽取首手 5 张牌</div>
+        </div>
+
+        <button id="end-turn" class="end-turn-button" type="button" disabled>
+          <span id="end-turn-label">结束部署</span>
+          <strong id="end-turn-copy">开始生态结算</strong>
+          <i aria-hidden="true">→</i>
+        </button>
+      </section>
+    </main>
+
+    <div id="environment-modal" class="modal">
+      <div class="modal-card environment-choice-card">
+        <p class="overline">CHOOSE GLOBAL ENVIRONMENT</p>
+        <h2>选择本局环境牌</h2>
+        <p>三张环境牌不会进入抽牌堆，而会在整局游戏中持续生效。</p>
+        <div id="environment-choices" class="environment-choices"></div>
+      </div>
+    </div>
+
+    <div id="audit-modal" class="modal" hidden>
+      <div class="modal-card audit-modal-card">
+        <p class="overline">STABILITY AUDIT</p>
+        <div class="result-emblem">10</div>
+        <h2>进入无人干预稳定性考核</h2>
+        <p>接下来连续模拟 10 回合。不能再出牌，随机事件仍会发生。各营养级不得灭绝，数量需保持在合理波动带内。</p>
+        <button id="start-audit-button" class="restart-button" type="button">
+          开始稳定性考核
+        </button>
+      </div>
+    </div>
+
+    <div id="history-modal" class="modal" hidden>
+      <div class="modal-card history-modal-card">
+        <button class="modal-close" data-close-modal type="button" aria-label="关闭">×</button>
+        <p class="overline">ECOSYSTEM ARCHIVE</p>
+        <h2>营养级历史曲线</h2>
+        <p>实线为构筑阶段，进入第 8 回合后的区域为无人干预考核。</p>
+        <div class="chart-legend">
+          <span class="grass">生产者</span>
+          <span class="gazelle">草食动物</span>
+          <span class="lion">捕食者</span>
+        </div>
+        <div id="history-chart" class="history-chart"></div>
+      </div>
+    </div>
+
+    <div id="result-modal" class="modal" hidden>
+      <div class="modal-card result-modal-card">
+        <p id="result-kicker" class="overline">STABILITY REPORT</p>
+        <div id="result-emblem" class="result-emblem">◎</div>
+        <h2 id="result-title">生物群系稳定</h2>
+        <p id="result-copy"></p>
+        <div id="result-metrics" class="result-metrics"></div>
+        <button id="restart-button" class="restart-button" type="button">重新开始关卡</button>
+      </div>
+    </div>
+
+    <script src="./vendor/phaser.min.js"></script>
+    <script type="module" src="./src/game.js"></script>
+  </body>
+</html>
